@@ -12,10 +12,9 @@
     Passwords are never asked during CSV onboarding:
       Secret column (password or key value; a Password column also works)
                               Each value is turned into a SecureString as it is read and the plain
-                              text is cleared. A row with an empty value fails and that account is
-                              NOT created, so no account is left without its password. Delete the
-                              file securely afterwards.
-      No Secret column        Accounts are created without a secret; let the CPM reconcile them.
+                              text is cleared. A row with no secret is still created, without one,
+                              and the output notes it. Delete the file securely afterwards.
+      No Secret column        Accounts are created without a secret.
       -PromptForPasswords, -AllowPlainTextPasswordColumn
                               No longer needed; kept so existing commands still run.
     Writes a results CSV (never containing secrets) next to the input file. Supports -WhatIf.
@@ -60,9 +59,9 @@ if ($rows.Count -gt 0) {
 $hasPasswordValues = [bool]$secretCol
 if ($PromptForPasswords) { Write-Warning 'CSV onboarding does not ask for passwords. -PromptForPasswords is ignored.' }
 if ($secretCol) {
-    Write-Host ("Using the passwords in the '{0}' column. A row with an empty value fails and that account is not created." -f $secretCol) -ForegroundColor Yellow
+    Write-Host ("Using the secrets in the '{0}' column. Rows without one are created without a secret." -f $secretCol) -ForegroundColor Yellow
 } else {
-    Write-Host 'This CSV has no Secret column, so the accounts are created without passwords for the CPM to reconcile.' -ForegroundColor Cyan
+    Write-Host 'This CSV has no Secret column, so the accounts are created without secrets.' -ForegroundColor Cyan
 }
 if (-not $ResultPath) {
     $ResultPath = Join-Path (Get-PCloudOutputFolder) ('{0}-results-{1:yyyyMMdd-HHmmss}.csv' -f [System.IO.Path]::GetFileNameWithoutExtension($Path), (Get-Date))
@@ -102,15 +101,17 @@ foreach ($row in $rows) {
         if ($row.Address) { $p['Address'] = $row.Address }
         if ($row.Name) { $p['Name'] = $row.Name }
         if ($row.SecretType) { $p['SecretType'] = $row.SecretType }
-        if ($secretCol) {
-            $plain = [string]$row.$secretCol
-            $row.$secretCol = $null
-            if (-not $plain) { throw ('The {0} column is empty for this row, so the account was not created (it would have had no password).' -f $secretCol) }
+        $plain = $null
+        if ($secretCol) { $plain = [string]$row.$secretCol; $row.$secretCol = $null }
+        if ($plain) {
             $ss = New-Object System.Security.SecureString
             foreach ($ch in $plain.ToCharArray()) { $ss.AppendChar($ch) }
             $ss.MakeReadOnly()
             $plain = $null
             $p['Secret'] = $ss
+        } else {
+            $message = 'Created without a secret (none in the CSV)'
+            Write-Host ("  {0}@{1}: no secret in the CSV; creating it without one." -f $row.UserName, $row.Address) -ForegroundColor Yellow
         }
         if ($row.AutomaticManagement -and $row.AutomaticManagement -match '^(?i)(false|0|no)$') {
             $p['DisableAutomaticManagement'] = $true

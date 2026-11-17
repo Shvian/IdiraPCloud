@@ -18,9 +18,8 @@
                            AutomaticManagement, ManualManagementReason, RemoteMachines (a;b), prop_<Name>.
                            CSV onboarding never asks for passwords. If the CSV has a Secret column (the
                            password or key; a Password column also works), each value becomes a SecureString
-                           as it is read and the plain text is cleared. A row with an empty value fails and
-                           that account is NOT created, so no account is left without its password. Without that column the accounts are
-                           created empty for the CPM to reconcile. Delete a CSV with passwords securely.
+                           as it is read and the plain text is cleared. A row with no secret is still created,
+                           without one, and the output notes it. Delete a CSV with passwords securely.
                            Passwords are only asked when adding one account at a time.
                            -PromptForPasswords applies to a single account without -CsvPath.
       UpdateAccount        Change name, address, user name, platform, platform properties and automatic
@@ -742,9 +741,9 @@ function Invoke-AccountAction {
             $secretCol = Get-CsvSecretColumn -Rows $rows
             if ($PromptForPasswords) { Write-Warning 'CSV onboarding does not ask for passwords. -PromptForPasswords is ignored.' }
             if ($secretCol) {
-                Write-Host ("Using the passwords in the '{0}' column. A row with an empty value fails and that account is not created." -f $secretCol) -ForegroundColor Yellow
+                Write-Host ("Using the secrets in the '{0}' column. Rows without one are created without a secret." -f $secretCol) -ForegroundColor Yellow
             } else {
-                Write-Host 'This CSV has no Secret column, so the accounts are created without passwords for the CPM to reconcile.' -ForegroundColor Cyan
+                Write-Host 'This CSV has no Secret column, so the accounts are created without secrets.' -ForegroundColor Cyan
             }
         }
         $r = 0
@@ -754,7 +753,7 @@ function Invoke-AccountAction {
             if ($secretCol) { $sec = ConvertFrom-CsvSecret -Row $row -Column $secretCol }
             try {
                 $spec = ConvertTo-AccountSpec -Row $row -Index $r
-                if ($secretCol) { $spec.Secret = $sec; $spec.SecretRequired = $true; $sec = $null }
+                if ($secretCol) { $spec.Secret = $sec; $sec = $null }
                 $specs.Add($spec)
             } catch {
                 if ($sec) { $sec.Dispose() }
@@ -801,15 +800,18 @@ function Invoke-AccountAction {
                 }
                 'AddAccount' {
                     $label = '{0}@{1} in safe {2}' -f $spec.UserName, $spec.Address, $spec.SafeName
-                    if ($spec.SecretRequired -and -not $spec.Secret) {
-                        throw ('The {0} column is empty for this row, so the account was not created (it would have had no password).' -f $secretCol)
+                    $note = $null
+                    if (-not $spec.Secret) {
+                        $note = 'Created without a secret (none in the CSV)'
+                        if (-not $CsvPath) { $note = 'Created without a secret' }
+                        Write-Host ('  {0}: no secret given; creating it without one.' -f $label) -ForegroundColor Yellow
                     }
                     try {
                         if ($ScriptCmdlet.ShouldProcess($label, 'AddAccount')) {
                             $new = Invoke-AddAccount -Spec $spec
-                            $results.Add((New-ResultRow -Row $spec.Index -Action $Action -Target $label -Id $new.id -Status 'Success'))
+                            $results.Add((New-ResultRow -Row $spec.Index -Action $Action -Target $label -Id $new.id -Status 'Success' -Message $note))
                         } else {
-                            $results.Add((New-ResultRow -Row $spec.Index -Action $Action -Target $label -Status 'WhatIf'))
+                            $results.Add((New-ResultRow -Row $spec.Index -Action $Action -Target $label -Status 'WhatIf' -Message $note))
                         }
                     } finally {
                         # A secret read from the CSV is disposed as soon as its row is done.
