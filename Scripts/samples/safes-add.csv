@@ -1,0 +1,4 @@
+SafeName,Description,ManagingCPM,Location,NumberOfDaysRetention,NumberOfVersionsRetention,AutoPurgeEnabled
+Linux-Root,Root accounts for Linux servers,PasswordManager,\,7,,false
+Win-Servers,Local admin accounts for Windows servers,PasswordManager,\,,5,false
+Win-Domain-Admins,Domain admin accounts,PasswordManager,\,14,,false

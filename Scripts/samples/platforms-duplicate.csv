@@ -1,0 +1,3 @@
+PlatformId,NewName,Description
+UnixSSH,UnixSSH-Prod,Production Unix servers
+WinServerLocal,WinServerLocal-DMZ,DMZ Windows servers

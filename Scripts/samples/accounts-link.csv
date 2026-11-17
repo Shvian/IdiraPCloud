@@ -1,0 +1,4 @@
+AccountId,SafeName,UserName,Address,LinkType,LinkedAccountId,LinkedSafe,LinkedName,LinkedFolder
+12_34,,,,ReconcileAccount,12_99,,,
+,Win-Servers,Administrator,srv01.acme.local,LogonAccount,,Win-Logon,Operating System-WinDomain-acme.local-svc_logon,Root
+,Linux-Root,root,10.0.0.5,3,,Linux-Recon,Operating System-UnixSSH-10.0.0.5-recon,

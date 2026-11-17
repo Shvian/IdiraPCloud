@@ -1,0 +1,4 @@
+SafeName,NewSafeName,Description,ManagingCPM,Location,NumberOfDaysRetention,NumberOfVersionsRetention
+Linux-Root,,Root accounts - production Linux,,,,
+Win-Servers,,,PasswordManager1,,,10
+Win-Domain-Admins,Win-DomainAdmins,,,,30,

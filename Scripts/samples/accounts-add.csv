@@ -1,0 +1,4 @@
+SafeName,PlatformId,UserName,Address,Name,SecretType,AutomaticManagement,ManualManagementReason,RemoteMachines,prop_LogonDomain,prop_Port
+Linux-Root,UnixSSH,root,10.0.0.5,,password,true,,,,22
+Win-Servers,WinServerLocal,Administrator,srv01.acme.local,,password,true,,,,
+Win-Domain,WinDomain,svc_sql,acme.local,,password,false,Service account - changed in maintenance window,sql01.acme.local;sql02.acme.local,ACME,

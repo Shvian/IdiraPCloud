@@ -1,0 +1,4 @@
+PlatformId,PSMServerId,EnableConnectors,DisableConnectors,AddConnectors,RemoveConnectors
+WinDomain,PSMServer_EU,PSM-RDP,,PSM-RDPConsole,
+UnixSSH,,,PSM-WinSCP,PSM-SSH,
+WinServerLocal,,,,,PSM-RDPConsole

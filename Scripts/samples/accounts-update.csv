@@ -1,0 +1,4 @@
+AccountId,SafeName,UserName,Address,NewName,NewAddress,NewUserName,NewPlatformId,AutomaticManagement,ManualManagementReason,prop_Port,prop_Location
+12_34,,,,,,,,,,2222,
+,Linux-Root,root,10.0.0.5,,10.0.0.50,,,,,,(remove)
+,Win-Domain,svc_sql,acme.local,,,,,false,Owned by the DBA team,,

@@ -1,0 +1,4 @@
+SafeName,PlatformId,Address,UserName,AutomaticManagement,ManualManagementReason,prop_LogonDomain,prop_Port
+Win-Servers,WinServerLocal,srv01.acme.local,Administrator,true,,,
+Linux-Root,UnixSSH,10.0.0.5,root,true,,,2222
+Win-Domain,WinDomain,acme.local,svc_sql,false,Service account,ACME,

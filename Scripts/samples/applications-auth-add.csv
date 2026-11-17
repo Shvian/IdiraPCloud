@@ -1,0 +1,6 @@
+AppID,AuthType,AuthValue,IsFolder,AllowInternalScripts,Comment,Subject,Issuer,SubjectAlternativeName
+BillingApp,machineAddress,10.0.1.25,,,,,,
+BillingApp,path,C:\Billing\run.exe,false,false,,,,
+BillingApp,osUser,ACME\svc_billing,,,,,,
+ReportsApp,hash,0123456789ABCDEF0123456789ABCDEF01234567,,,Reports build 4.2,,,
+ReportsApp,certificateattr,,,,,CN=reports;OU=Apps,CN=ACME Issuing CA,DNS Name=reports01.example.com

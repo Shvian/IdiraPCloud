@@ -1,0 +1,3 @@
+AccountId,DependentId,Name,AutomaticManagement,ManualManagementReason,DisableParentAutomaticManagement,prop_Address,prop_ServiceName
+12_34,5,,false,Service moving,,,
+12_34,6,,,,,srv02.acme.local,(remove)

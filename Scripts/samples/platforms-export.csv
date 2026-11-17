@@ -1,0 +1,4 @@
+PlatformId,Path
+UnixSSH,
+WinDomain,C:\Temp\Platforms
+WinServerLocal,C:\Temp\Platforms\WinServerLocal-backup.zip

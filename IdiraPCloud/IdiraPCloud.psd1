@@ -1,0 +1,103 @@
+@{
+    RootModule        = 'IdiraPCloud.psm1'
+    ModuleVersion     = '2.8.0'
+    GUID              = '61b823f0-567b-4394-9182-a8d071b68d98'
+    Author            = 'Ian'
+    Description       = 'PowerShell 5.1 functions for Idira (formerly CyberArk) Privilege Cloud REST APIs: auth, accounts, safes, safe members, platforms, users/groups and monitoring.'
+    PowerShellVersion = '5.1'
+    FunctionsToExport = @(
+        'Resolve-PCloudTargetPlatform',
+        'Set-PCloudApiTrace',
+        'Set-PCloudIdleTimeout',
+        'Get-PCloudIdleTimeout',
+        'Get-PCloudIdleSecondsLeft',
+        'Register-PCloudActivity',
+        'Invoke-PCloudIdleCheck',
+        'Set-PCloudRateLimit',
+        'Get-PCloudRateLimit',
+        'Get-PCloudPlatformLinkedAccountType',
+        'Set-PCloudPlatformPSMConfig',
+        'Get-PCloudPlatformPSMConfig',
+        'Get-PCloudPSMServer',
+        'Get-PCloudMasterPolicy',
+        'Get-PCloudMasterRotationPolicy',
+        'Get-PCloudMasterRotationPolicyException',
+        'Set-PCloudMasterRotationPolicy',
+        'Get-PCloudDependentPlatform',
+        'Get-PCloudAccountDependent',
+        'New-PCloudAccountDependent',
+        'Set-PCloudAccountDependent',
+        'Remove-PCloudAccountDependent',
+        'Add-PCloudAccountDependentLink',
+        'Remove-PCloudAccountDependentLink',
+        'Get-PCloudLocation',
+        'New-PCloudLocation',
+        'Set-PCloudLocation',
+        'Remove-PCloudLocation',
+        'Get-PCloudApplication',
+        'New-PCloudApplication',
+        'Remove-PCloudApplication',
+        'Get-PCloudApplicationAuthentication',
+        'Add-PCloudApplicationAuthentication',
+        'Remove-PCloudApplicationAuthentication',
+        'ConvertTo-PCloudFlatSetting',
+        'Add-PCloudGroupMember',
+        'Add-PCloudLinkedAccount',
+        'Add-PCloudSafeMember',
+        'ConvertFrom-PCloudUnixTime',
+        'ConvertTo-PCloudUnixTime',
+        'Copy-PCloudTargetPlatform',
+        'Disable-PCloudTargetPlatform',
+        'Enable-PCloudTargetPlatform',
+        'Export-PCloudPlatform',
+        'Get-PCloudAccount',
+        'Get-PCloudAccountPassword',
+        'Get-PCloudGroup',
+        'Get-PCloudLiveSession',
+        'Get-PCloudPlatform',
+        'Get-PCloudRecording',
+        'Get-PCloudSafe',
+        'Get-PCloudSafeMember',
+        'Get-PCloudSafePermissionPreset',
+        'Get-PCloudSafePermissionSet',
+        'Get-PCloudSession',
+        'Get-PCloudSystemHealth',
+        'Get-PCloudTargetPlatform',
+        'Get-PCloudUser',
+        'Import-PCloudPlatform',
+        'Invoke-PCloudAccountChange',
+        'Invoke-PCloudAccountCheckIn',
+        'Invoke-PCloudAccountReconcile',
+        'Invoke-PCloudAccountVerify',
+        'Invoke-PCloudApi',
+        'New-PCloudAccount',
+        'New-PCloudGroup',
+        'New-PCloudSafe',
+        'New-PCloudSession',
+        'Remove-PCloudAccount',
+        'Remove-PCloudGroup',
+        'Remove-PCloudGroupMember',
+        'Resolve-PCloudSafeMemberType',
+        'Remove-PCloudLinkedAccount',
+        'Remove-PCloudSafe',
+        'Remove-PCloudSafeMember',
+        'Remove-PCloudSession',
+        'Remove-PCloudTargetPlatform',
+        'Set-PCloudAccount',
+        'Set-PCloudAccountNextPassword',
+        'Set-PCloudAccountPasswordInVault',
+        'Set-PCloudGroup',
+        'Set-PCloudSafe',
+        'Set-PCloudSafeMember',
+        'Update-PCloudSession',
+        'Stop-PCloudLiveSession'
+    )
+    CmdletsToExport   = @()
+    VariablesToExport = @()
+    AliasesToExport   = @()
+    PrivateData       = @{
+        PSData = @{
+            Tags = @('CyberArk', 'Idira', 'PrivilegeCloud', 'PAM', 'REST')
+        }
+    }
+}

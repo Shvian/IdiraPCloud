@@ -1,0 +1,3 @@
+AppID,Description,Location,AccessPermittedFrom,AccessPermittedTo,ExpirationDate,Disabled,BusinessOwnerFName,BusinessOwnerLName,BusinessOwnerEmail,BusinessOwnerPhone
+BillingApp,Billing batch jobs,\,0,23,,false,Jane,Doe,jane.doe@example.com,
+ReportsApp,Nightly reports,\,1,5,2027-12-31,false,,,,

@@ -1,0 +1,5 @@
+SafeName,MemberName,Preset,ExpirationDate,IsReadOnly,retrieveAccounts,viewAuditLog,useAccounts,manageSafeMembers
+Linux-Root,unix-admins,Full,,,,,,
+Linux-Root,jdoe@acme.com,,2027-03-31,,false,,,
+Win-Servers,Privilege Cloud Users,,,,,true,,
+Win-Domain-Admins,helpdesk@acme.com,ReadOnly,,,,true,,

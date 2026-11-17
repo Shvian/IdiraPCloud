@@ -1,0 +1,3 @@
+AccountId,PlatformId,Name,AutomaticManagement,ManualManagementReason,DisableParentAutomaticManagement,prop_Address,prop_ServiceName,prop_TaskName
+12_34,WinService,Billing service,true,,,srv01.acme.local,BillingSvc,
+12_34,WinScheduledTask,Nightly export,true,,,srv01.acme.local,,\Exports\Nightly
