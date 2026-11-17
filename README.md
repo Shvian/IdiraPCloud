@@ -326,7 +326,7 @@ In member CSVs, any permission name can be a column (`retrieveAccounts`, `viewAu
 |---|---|---|---|
 | `GetAccounts` | nothing (every account), `-SafeName` and/or `-Search` | `accounts-get.csv` | Includes automatic management, CPM status and last modified/verified/reconciled times. |
 | `GetAccountDetails` | `-AccountId`, or `-SafeName -UserName [-Address]` | `accounts-ids.csv` | Every field, with each platform property as a `prop_<Name>` column. |
-| `AddAccount` | `-SafeName -PlatformId -UserName [-Address -Name -PlatformAccountProperties @{} -DisableAutomaticManagement -ManualManagementReason]`, `-Secret <SecureString>` or `-PromptForPasswords` | `accounts-add.csv` | From the menu, the safe is checked, the platform is picked from the active platforms, properties are asked one by one and the password is a masked prompt (Enter leaves it empty for the CPM to reconcile). **A CSV with a non-empty `Password` column is refused.** |
+| `AddAccount` | `-SafeName -PlatformId -UserName [-Address -Name -PlatformAccountProperties @{} -DisableAutomaticManagement -ManualManagementReason]`, `-Secret <SecureString>` or `-PromptForPasswords` (single account only) | `accounts-add.csv` | From the menu, the safe is checked, the platform is picked from the active platforms, properties are asked one by one and the password is a masked prompt (Enter leaves it empty for the CPM to reconcile). **CSV onboarding never asks for passwords**: the accounts are created empty for the CPM to reconcile. A CSV with a non-empty `Password` column is refused. |
 | `UpdateAccount` | `-AccountId` (or lookup) plus any of `-NewName -NewAddress -NewUserName -NewPlatformId -AutomaticManagement true/false -ManualManagementReason -PlatformAccountProperties @{}` | `accounts-update.csv` | With no new values, opens the update menu: name, address, user name, platform (from the list), platform properties (add, change or remove) and automatic management on or off with a reason. In CSVs, `prop_<Name>` set to `(remove)` removes that property, and blank cells change nothing. |
 | `LinkAccount` | `-AccountId` (or lookup) `-LinkType` plus `-LinkedAccountId`, or `-LinkedSafe -LinkedName [-LinkedFolder]` | `accounts-link.csv` | From the menu: choose the account, pick the link type from the ones its platform offers (logon, enable, reconcile... with their index), then find the linked account by ID, by searching a safe, or with N to type the safe and object name. `-LinkType` takes a name such as `LogonAccount` or `ReconcileAccount`, or the index number. |
 | `UnlinkAccount` | `-AccountId` (or lookup) `-LinkType` | `accounts-unlink.csv` | Removes that linked account from the account. |
@@ -413,7 +413,7 @@ Read only. Shows every Master Policy setting as a `Setting`/`Value` row and asks
 ```powershell
 .\Manage-Accounts.ps1
 .\Manage-Accounts.ps1 -Action UpdateAccount -AccountId 12_34
-.\Manage-Accounts.ps1 -Action AddAccount -CsvPath .\samples\accounts-add.csv -PromptForPasswords -WhatIf
+.\Manage-Accounts.ps1 -Action AddAccount -CsvPath .\samples\accounts-add.csv -WhatIf
 .\Manage-Platforms.ps1 -Action GetPlatforms -Active true -ExportCsv
 .\Manage-Platforms.ps1 -Action ExportPlatform -CsvPath .\samples\platforms-export.csv
 .\Manage-PlatformPSM.ps1 -Action GetPlatformPSM -ExportCsv
@@ -421,7 +421,7 @@ Read only. Shows every Master Policy setting as a `Setting`/`Value` row and asks
 .\Get-MasterPolicy.ps1 -OutputPath .\master-policy.csv
 ```
 
-Sample CSV for onboarding (`Scripts\accounts-sample.csv`). Any `prop_` column becomes a platform account property. The CSV holds **no passwords**: either let the CPM reconcile the new accounts, or add `-PromptForPasswords` to type each one into a masked prompt.
+Sample CSV for onboarding (`Scripts\accounts-sample.csv`). Any `prop_` column becomes a platform account property. The CSV holds **no passwords**: the new accounts are created empty for the CPM to reconcile. To type a password, add that account on its own from the Accounts menu.
 
 ```csv
 SafeName,PlatformId,Address,UserName,AutomaticManagement,ManualManagementReason,prop_LogonDomain,prop_Port

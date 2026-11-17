@@ -17,7 +17,9 @@
                            CSV columns: SafeName, PlatformId, UserName, Address, Name, SecretType,
                            AutomaticManagement, ManualManagementReason, RemoteMachines (a;b), prop_<Name>.
                            Passwords are never read from a CSV: a non-empty Password column stops the run.
-                           Use -PromptForPasswords to be asked for each password (masked).
+                           CSV onboarding never asks for passwords: the accounts are created empty for the
+                           CPM to reconcile. Passwords are only asked when adding one account at a time.
+                           -PromptForPasswords applies to a single account without -CsvPath.
       UpdateAccount        Change name, address, user name, platform, platform properties and automatic
                            management. For a single account with no new values given, a menu shows the current
                            values and lets you pick what to change. All changes go in one request; if it fails,
@@ -57,7 +59,7 @@
 .EXAMPLE
     .\Manage-Accounts.ps1 -Action GetAccountDetails -CsvPath .\samples\accounts-ids.csv -OutputPath .\details.csv
 .EXAMPLE
-    .\Manage-Accounts.ps1 -Action AddAccount -CsvPath .\samples\accounts-add.csv -PromptForPasswords -WhatIf
+    .\Manage-Accounts.ps1 -Action AddAccount -CsvPath .\samples\accounts-add.csv -WhatIf
 .EXAMPLE
     .\Manage-Accounts.ps1 -Action UpdateAccount -AccountId 12_34
     # opens the update menu for that account
@@ -710,8 +712,9 @@ function Invoke-AccountAction {
         if ($Action -eq 'AddAccount') {
             $hasPw = @($rows | Where-Object { ($_.PSObject.Properties.Name -contains 'Password') -and $_.Password }).Count -gt 0
             if ($hasPw) {
-                throw ('{0} contains plain-text passwords. Remove the Password column and use -PromptForPasswords (masked), or leave passwords empty for the CPM to reconcile. Delete the file securely.' -f $CsvPath)
+                throw ('{0} contains plain-text passwords. Remove the Password column and leave passwords empty for the CPM to reconcile, or add those accounts one at a time with a masked prompt. Delete the file securely.' -f $CsvPath)
             }
+            if ($PromptForPasswords) { Write-Warning 'CSV onboarding does not ask for passwords. -PromptForPasswords is ignored; the accounts are created empty for the CPM to reconcile.' }
         }
         $r = 0
         foreach ($row in $rows) {
@@ -758,7 +761,6 @@ function Invoke-AccountAction {
                 }
                 'AddAccount' {
                     $label = '{0}@{1} in safe {2}' -f $spec.UserName, $spec.Address, $spec.SafeName
-                    if ($CsvPath -and $PromptForPasswords) { $spec.Secret = Read-Secret -Label ('{0}@{1}' -f $spec.UserName, $spec.Address) }
                     try {
                         if ($ScriptCmdlet.ShouldProcess($label, 'AddAccount')) {
                             $new = Invoke-AddAccount -Spec $spec
@@ -767,6 +769,7 @@ function Invoke-AccountAction {
                             $results.Add((New-ResultRow -Row $spec.Index -Action $Action -Target $label -Status 'WhatIf'))
                         }
                     } finally {
+                        # CSV specs never carry a secret; only a single add can.
                         if ($CsvPath -and $spec.Secret) { $spec.Secret.Dispose(); $spec.Secret = $null }
                     }
                 }
@@ -914,7 +917,7 @@ while ($true) {
             if ($f) { $CsvPath = $f }
         }
         if ($Action -eq 'AddAccount' -and $CsvPath) {
-            $PromptForPasswords = [switch](Read-YesNo 'Ask for each password with a masked prompt? (No leaves them empty for the CPM to reconcile)')
+            Write-Host 'Accounts from a CSV are created without passwords for the CPM to reconcile.' -ForegroundColor Cyan
         }
 
         if (-not $CsvPath) {

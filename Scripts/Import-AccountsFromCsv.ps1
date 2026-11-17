@@ -11,7 +11,8 @@
 
     Secrets are never read from the CSV by default:
       (default)               Accounts are created without a secret; let the CPM reconcile them.
-      -PromptForPasswords     You are asked for each account's password with a masked prompt.
+      -PromptForPasswords     No longer used: CSV onboarding never asks for passwords. Add an account
+                              one at a time in Manage-Accounts.ps1 to type its password.
       -AllowPlainTextPasswordColumn
                               Reads a Password column. Plain-text passwords in files are a security
                               risk; use only if unavoidable and delete the file securely afterwards.
@@ -21,7 +22,7 @@
 .EXAMPLE
     .\Import-AccountsFromCsv.ps1 -Path .\accounts.csv -Subdomain acme
 .EXAMPLE
-    .\Import-AccountsFromCsv.ps1 -Path .\accounts.csv -PromptForPasswords
+    .\Import-AccountsFromCsv.ps1 -Path .\accounts.csv -SkipExisting
 .EXAMPLE
     .\Import-AccountsFromCsv.ps1 -Path .\accounts.csv -WhatIf
 #>
@@ -51,10 +52,10 @@ $rows = @(Import-Csv -LiteralPath $Path)
 
 $hasPasswordValues = @($rows | Where-Object { ($_.PSObject.Properties.Name -contains 'Password') -and $_.Password }).Count -gt 0
 if ($hasPasswordValues -and -not $AllowPlainTextPasswordColumn) {
-    throw ('{0} contains plain-text passwords. Remove the Password column and use -PromptForPasswords (or let the CPM reconcile), or pass -AllowPlainTextPasswordColumn if you accept the risk.' -f $Path)
+    throw ('{0} contains plain-text passwords. Remove the Password column and let the CPM reconcile, or pass -AllowPlainTextPasswordColumn if you accept the risk.' -f $Path)
 }
-if ($PromptForPasswords -and $AllowPlainTextPasswordColumn) {
-    throw 'Use either -PromptForPasswords or -AllowPlainTextPasswordColumn, not both.'
+if ($PromptForPasswords) {
+    Write-Warning 'CSV onboarding does not ask for passwords. -PromptForPasswords is ignored; the accounts are created empty for the CPM to reconcile.'
 }
 if (-not $ResultPath) {
     $ResultPath = Join-Path (Get-PCloudOutputFolder) ('{0}-results-{1:yyyyMMdd-HHmmss}.csv' -f [System.IO.Path]::GetFileNameWithoutExtension($Path), (Get-Date))
@@ -93,10 +94,7 @@ foreach ($row in $rows) {
         if ($row.Address) { $p['Address'] = $row.Address }
         if ($row.Name) { $p['Name'] = $row.Name }
         if ($row.SecretType) { $p['SecretType'] = $row.SecretType }
-        if ($PromptForPasswords) {
-            $sec = Read-Host -AsSecureString -Prompt ("Password for {0}@{1} (Enter to skip)" -f $row.UserName, $row.Address)
-            if ($sec.Length -gt 0) { $p['Secret'] = $sec }
-        } elseif ($AllowPlainTextPasswordColumn -and $row.Password) {
+        if ($AllowPlainTextPasswordColumn -and $row.Password) {
             $p['Secret'] = ConvertTo-SecureString -String $row.Password -AsPlainText -Force
             $row.Password = $null
         }
