@@ -10,12 +10,12 @@
                           property (prop_LogonDomain -> LogonDomain, prop_Port -> Port).
 
     Passwords are never asked during CSV onboarding:
-      Password (or Secret) column present
+      Secret column (password or key value; a Password column also works)
                               Each value is turned into a SecureString as it is read and the plain
                               text is cleared. A row with an empty value fails and that account is
                               NOT created, so no account is left without its password. Delete the
                               file securely afterwards.
-      No Password column      Accounts are created without a secret; let the CPM reconcile them.
+      No Secret column        Accounts are created without a secret; let the CPM reconcile them.
       -PromptForPasswords, -AllowPlainTextPasswordColumn
                               No longer needed; kept so existing commands still run.
     Writes a results CSV (never containing secrets) next to the input file. Supports -WhatIf.
@@ -52,7 +52,7 @@ $rows = @(Import-Csv -LiteralPath $Path)
 
 $secretCol = $null
 if ($rows.Count -gt 0) {
-    foreach ($n in @('Password', 'Secret')) {
+    foreach ($n in @('Secret', 'Password')) {
         $c = $rows[0].PSObject.Properties | Where-Object { $_.Name -eq $n } | Select-Object -First 1
         if ($c) { $secretCol = $c.Name; break }
     }
@@ -62,7 +62,7 @@ if ($PromptForPasswords) { Write-Warning 'CSV onboarding does not ask for passwo
 if ($secretCol) {
     Write-Host ("Using the passwords in the '{0}' column. A row with an empty value fails and that account is not created." -f $secretCol) -ForegroundColor Yellow
 } else {
-    Write-Host 'This CSV has no Password column, so the accounts are created without passwords for the CPM to reconcile.' -ForegroundColor Cyan
+    Write-Host 'This CSV has no Secret column, so the accounts are created without passwords for the CPM to reconcile.' -ForegroundColor Cyan
 }
 if (-not $ResultPath) {
     $ResultPath = Join-Path (Get-PCloudOutputFolder) ('{0}-results-{1:yyyyMMdd-HHmmss}.csv' -f [System.IO.Path]::GetFileNameWithoutExtension($Path), (Get-Date))

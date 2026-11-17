@@ -14,10 +14,11 @@
                            CSV columns: AccountId, or SafeName, UserName, Address.
       AddAccount           Onboard accounts. From the menu you pick the safe and platform from lists, and
                            the password is asked with a masked prompt (or left empty for the CPM to reconcile).
-                           CSV columns: SafeName, PlatformId, UserName, Address, Name, SecretType,
+                           CSV columns: SafeName, PlatformId, UserName, Address, Name, SecretType, Secret,
                            AutomaticManagement, ManualManagementReason, RemoteMachines (a;b), prop_<Name>.
-                           CSV onboarding never asks for passwords. If the CSV has a Password (or Secret)
-                           column, each value is turned into a SecureString as it is read and the plain text
+                           CSV onboarding never asks for passwords. If the CSV has a Secret column (the
+                           password or key; a Password column also works), each value becomes a SecureString
+                           as it is read and the plain text
                            is cleared; a row with an empty value fails and that account is NOT created, so
                            no account is left without its password. Without that column the accounts are
                            created empty for the CPM to reconcile. Delete a CSV with passwords securely.
@@ -253,10 +254,10 @@ function Read-PlatformId {
 }
 
 function Get-CsvSecretColumn {
-    # Name of the Password or Secret column in a CSV, or $null when there is none.
+    # Name of the Secret (or Password) column in a CSV, or $null when there is none.
     param([object[]]$Rows)
     if ($Rows.Count -eq 0) { return $null }
-    foreach ($n in @('Password', 'Secret')) {
+    foreach ($n in @('Secret', 'Password')) {
         $c = $Rows[0].PSObject.Properties | Where-Object { $_.Name -eq $n } | Select-Object -First 1
         if ($c) { return $c.Name }
     }
@@ -744,7 +745,7 @@ function Invoke-AccountAction {
             if ($secretCol) {
                 Write-Host ("Using the passwords in the '{0}' column. A row with an empty value fails and that account is not created." -f $secretCol) -ForegroundColor Yellow
             } else {
-                Write-Host 'This CSV has no Password column, so the accounts are created without passwords for the CPM to reconcile.' -ForegroundColor Cyan
+                Write-Host 'This CSV has no Secret column, so the accounts are created without passwords for the CPM to reconcile.' -ForegroundColor Cyan
             }
         }
         $r = 0
