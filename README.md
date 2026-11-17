@@ -117,7 +117,8 @@ Every command has comment-based help, so `Get-Help New-PCloudAccount -Full` show
 | `Get-PCloudAccount [-Search] [-SearchType] [-SafeName] [-Filter] [-Sort] [-First]` | `GET /Accounts` (follows every page) |
 | `Get-PCloudAccount -Id 12_34` | `GET /Accounts/{id}` |
 | `New-PCloudAccount` | `POST /Accounts` |
-| `Set-PCloudAccount -Id … [-Name] [-Address] [-UserName] [-PlatformId] [-Property @{}] [-Operation]` | `PATCH /Accounts/{id}` (JSON Patch) |
+| `Set-PCloudAccount -Id … [-Name] [-Address] [-UserName] [-PlatformId] [-Property @{}] [-Operation]` | `PATCH /Accounts/{id}` (JSON Patch). Platform properties are sent as one `{"op":"add","path":"/platformaccountproperties","value":{"Name":"value"}}` operation; removals use `"op":"remove"` with a `null` value |
+| `New-PCloudAccountPropertyOperation -Set @{} -Remove @()` | Builds those platform property operations for `-Operation` |
 | `Remove-PCloudAccount` | `DELETE /Accounts/{id}` |
 | `Get-PCloudAccountPassword -Reason … [-TicketId] [-AsPlainText]` | `POST /Accounts/{id}/Password/Retrieve` |
 | `Invoke-PCloudAccountChange [-ChangeEntireGroup]` | `POST /Accounts/{id}/Change` |

@@ -380,6 +380,8 @@ function ConvertTo-AccountOperations {
     param($Account, [System.Collections.IDictionary]$Changes)
     $ops = New-Object System.Collections.Generic.List[object]
     $existing = Get-AccountProperties $Account
+    $propSet = [ordered]@{}
+    $propRemove = New-Object System.Collections.Generic.List[string]
     foreach ($k in $Changes.Keys) {
         $v = $Changes[$k].Value
         switch -Regex ($k) {
@@ -398,18 +400,17 @@ function ConvertTo-AccountOperations {
                 # Use the property's existing spelling if it is already set.
                 $known = @($existing.Keys | Where-Object { $_ -eq $pn }) | Select-Object -First 1
                 if ($known) { $pn = [string]$known }
-                $path = '/platformAccountProperties/{0}' -f $pn
                 if ($null -eq $v) {
                     if (-not $known) { throw ("Property '{0}' is not set on this account, so it cannot be removed." -f $pn) }
-                    $ops.Add([ordered]@{ op = 'remove'; path = $path })
-                } elseif ($known) {
-                    $ops.Add([ordered]@{ op = 'replace'; path = $path; value = [string]$v })
+                    $propRemove.Add($pn)
                 } else {
-                    $ops.Add([ordered]@{ op = 'add'; path = $path; value = [string]$v })
+                    $propSet[$pn] = [string]$v
                 }
             }
         }
     }
+    # Platform properties go in one operation on /platformaccountproperties with an object value.
+    foreach ($o in @(New-PCloudAccountPropertyOperation -Set $propSet -Remove $propRemove.ToArray())) { $ops.Add($o) }
     return $ops
 }
 
