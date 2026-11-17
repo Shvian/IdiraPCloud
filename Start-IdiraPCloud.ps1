@@ -86,11 +86,13 @@ while ($true) {
     }
     for ($i = 0; $i -lt $areas.Count; $i++) { Write-Host ('  {0}) {1,-25} {2}' -f ($i + 1), $areas[$i].Name, $areas[$i].Text) }
     Write-Host '  S) Session details'
-    Write-Host '  X) Sign out and quit'
+    Write-Host '  L) Log out (sign out, clear this PowerShell session, stay in the menu)'
+    Write-Host '  X) Log out and quit'
     Write-Host '  Q) Quit (keep the session for this PowerShell window)'
-    $c = (Read-Host ('Enter 1-{0}, S, X or Q' -f $areas.Count)).Trim()
+    $c = (Read-Host ('Enter 1-{0}, S, L, X or Q' -f $areas.Count)).Trim()
     if ($c -match '^(?i)q$') { break }
-    if ($c -match '^(?i)x$') { Remove-PCloudSession; Write-Host 'Signed out.'; break }
+    if ($c -match '^(?i)l$') { Disconnect-PCloudSession; continue }
+    if ($c -match '^(?i)x$') { Disconnect-PCloudSession; break }
     if ($c -match '^(?i)s$') { Get-PCloudSession | Format-List | Out-String | Write-Host; continue }
     $n = 0
     if (-not ([int]::TryParse($c, [ref]$n) -and $n -ge 1 -and $n -le $areas.Count)) { Write-Host 'Invalid choice.' -ForegroundColor Yellow; continue }

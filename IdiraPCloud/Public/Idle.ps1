@@ -46,10 +46,11 @@ function Invoke-PCloudIdleCheck {
     if ($null -eq $script:PCloudSession -or $script:PCloudIdle.Minutes -le 0) { return $false }
     $idle = ([DateTime]::UtcNow - $script:PCloudIdle.LastActivity).TotalSeconds
     if ($idle -lt ($script:PCloudIdle.Minutes * 60)) { return $false }
-    Remove-PCloudSession
+    # Sign out and clear the window (variables, history, errors, screen) so nothing privileged is left on it.
+    Remove-PCloudSession -ClearPowerShellSession
     $script:PCloudIdle.SignedOut = $true
     Write-Host ''
-    Write-Host ('Signed out of Privilege Cloud after {0} minutes of inactivity. The tokens were cleared from memory; sign in again to continue.' -f $script:PCloudIdle.Minutes) -ForegroundColor Yellow
+    Write-Host ('Signed out of Privilege Cloud after {0} minutes of inactivity. The tokens and the data from this session were cleared from PowerShell; sign in again to continue.' -f $script:PCloudIdle.Minutes) -ForegroundColor Yellow
     return $true
 }
 

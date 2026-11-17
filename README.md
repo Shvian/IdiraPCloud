@@ -236,7 +236,7 @@ With `-All`, any response shaped `{ value: [...], nextLink: "..." }` is followed
 
 ## Main menu (`Start-IdiraPCloud.ps1`)
 
-The easiest way in. It signs you in once, then offers Safes, Accounts, Platforms, PSM assignment, Applications, Master Policy, System health and Reports. Reports opens a submenu with the account inventory and safe members reports. Each area opens its own menu. Pressing Q there brings you back to the main menu, and a failure in an area shows the error and returns you there too. S shows the session, X signs out and quits, and Q quits but keeps the session for that PowerShell window.
+The easiest way in. It signs you in once, then offers Safes, Accounts, Platforms, PSM assignment, Applications, Master Policy, System health and Reports. Reports opens a submenu with the account inventory and safe members reports. Each area opens its own menu. Pressing Q there brings you back to the main menu, and a failure in an area shows the error and returns you there too. S shows the session, L logs out and stays in the menu, X logs out and quits, and Q quits but keeps the session for that PowerShell window. Every area menu also has L) Log out. See [Log out and clearing the session](#log-out-and-clearing-the-session).
 
 ```powershell
 cd C:\Tools\IdiraPCloud
@@ -474,7 +474,7 @@ Set-PCloudRateLimit -MaxRequestsPerSecond 5 -MaxRetries 8 -MaxDelaySec 300
 
 ## Idle sign-out
 
-A session is signed out after **15 minutes with no API call and no input**. The access and refresh tokens are disposed and cleared from memory, the same as `Remove-PCloudSession`.
+A session is signed out after **15 minutes with no API call and no input**. The access and refresh tokens are disposed and cleared from memory, and the PowerShell window is cleared the same way as a log out (see below).
 
 - **At a script prompt:** every key you type counts as activity. When the limit passes, the running script stops with a message. Under `Start-IdiraPCloud.ps1` you're back at the main menu, and picking an area asks you to sign in again.
 - **At the PowerShell prompt** (after Q kept the session): a background check every 30 seconds signs you out.
@@ -482,6 +482,18 @@ A session is signed out after **15 minutes with no API call and no input**. The 
 - **Long jobs:** reports and bulk actions make API calls as they go, so they aren't interrupted.
 
 `Set-PCloudIdleTimeout -Minutes 10` changes the limit for the current PowerShell window, `-Minutes 0` turns it off, and `Get-PCloudIdleTimeout` shows the limit and the time left. The timed prompts need the normal PowerShell console. In the ISE, VS Code or with redirected input, prompts don't time out, but the 30-second check and the next-call check still apply.
+
+## Log out and clearing the session
+
+Logging out signs you out of Privilege Cloud and clears what the session left in the PowerShell window, which can hold privileged data. It happens when you pick **L) Log out** in any menu, **X** in the main menu, run `Disconnect-PCloudSession`, or are signed out for inactivity. It:
+
+- disposes the access token, refresh token and stored credential
+- removes the global variables created since the module loaded, such as `$accounts = Get-PCloudAccount ...`, and disposes any SecureString first
+- clears `$Error`, which can hold API responses, and the command history (`Get-History` and PSReadLine's in-memory history)
+- clears the screen, plus the scrollback in Windows Terminal
+- runs garbage collection
+
+It leaves alone the PSReadLine history file on disk, files the scripts wrote (`CSVs`, `Logs`), and a `-Log` transcript, which you asked for. The clipboard isn't touched either: `Get-AccountPassword.ps1` already clears what it copies. Q still quits without logging out, and `Remove-PCloudSession` still only signs out. Use `Remove-PCloudSession -ClearPowerShellSession` or `Clear-PCloudPowerShellSession` on its own to clear the window too.
 
 ## Logging a session (`-Log`)
 

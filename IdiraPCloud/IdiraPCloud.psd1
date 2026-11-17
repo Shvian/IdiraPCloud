@@ -1,6 +1,6 @@
 @{
     RootModule        = 'IdiraPCloud.psm1'
-    ModuleVersion     = '2.8.6'
+    ModuleVersion     = '2.9.0'
     GUID              = '61b823f0-567b-4394-9182-a8d071b68d98'
     Author            = 'Ian'
     Description       = 'PowerShell 5.1 functions for Idira (formerly CyberArk) Privilege Cloud REST APIs: auth, accounts, safes, safe members, platforms, users/groups and monitoring.'
@@ -82,6 +82,8 @@
         'Remove-PCloudSafe',
         'Remove-PCloudSafeMember',
         'Remove-PCloudSession',
+        'Disconnect-PCloudSession',
+        'Clear-PCloudPowerShellSession',
         'Remove-PCloudTargetPlatform',
         'Set-PCloudAccount',
         'New-PCloudAccountPropertyOperation',
