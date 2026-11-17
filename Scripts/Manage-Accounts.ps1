@@ -18,9 +18,8 @@
                            AutomaticManagement, ManualManagementReason, RemoteMachines (a;b), prop_<Name>.
                            CSV onboarding never asks for passwords. If the CSV has a Secret column (the
                            password or key; a Password column also works), each value becomes a SecureString
-                           as it is read and the plain text
-                           is cleared; a row with an empty value fails and that account is NOT created, so
-                           no account is left without its password. Without that column the accounts are
+                           as it is read and the plain text is cleared. A row with an empty value fails and
+                           that account is NOT created, so no account is left without its password. Without that column the accounts are
                            created empty for the CPM to reconcile. Delete a CSV with passwords securely.
                            Passwords are only asked when adding one account at a time.
                            -PromptForPasswords applies to a single account without -CsvPath.
