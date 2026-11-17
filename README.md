@@ -236,7 +236,7 @@ With `-All`, any response shaped `{ value: [...], nextLink: "..." }` is followed
 
 ## Main menu (`Start-IdiraPCloud.ps1`)
 
-The easiest way in. It signs you in once, then offers Safes, Accounts, Platforms, PSM assignment, Applications, Master Policy, System health and Reports. Reports opens a submenu with the account inventory and safe members reports. Each area opens its own menu. Pressing Q there brings you back to the main menu, and a failure in an area shows the error and returns you there too. S shows the session and X logs out and quits. The main menu has no plain quit, so leaving it always logs out. Every area menu also has L) Log out. See [Log out and clearing the session](#log-out-and-clearing-the-session).
+The easiest way in. It signs you in once, then offers Safes, Accounts, Platforms, PSM assignment, Applications, Master Policy, System health and Reports. Reports opens a submenu with the account inventory and safe members reports. Each area opens its own menu. Pressing Q there brings you back to the main menu, and a failure in an area shows the error and returns you there too. S shows the session and X logs out and quits. The main menu has no plain quit, so leaving it always logs out. See [Log out and clearing the session](#log-out-and-clearing-the-session).
 
 ```powershell
 cd C:\Tools\IdiraPCloud
@@ -485,7 +485,7 @@ A session is signed out after **15 minutes with no API call and no input**. The 
 
 ## Log out and clearing the session
 
-Logging out signs you out of Privilege Cloud and clears what the session left in the PowerShell window, which can hold privileged data. It happens when you pick **L) Log out** in an area menu, **X** in the main menu, run `Disconnect-PCloudSession`, or are signed out for inactivity. It:
+Logging out signs you out of Privilege Cloud and clears what the session left in the PowerShell window, which can hold privileged data. It happens when you pick **X) Log out and quit** in the main menu, run `Disconnect-PCloudSession`, or are signed out for inactivity. It:
 
 - disposes the access token, refresh token and stored credential
 - removes the global variables created since the module loaded, such as `$accounts = Get-PCloudAccount ...`, and disposes any SecureString first
@@ -493,7 +493,7 @@ Logging out signs you out of Privilege Cloud and clears what the session left in
 - clears the screen, plus the scrollback in Windows Terminal
 - runs garbage collection
 
-It leaves alone the PSReadLine history file on disk, files the scripts wrote (`CSVs`, `Logs`), and a `-Log` transcript, which you asked for. The clipboard isn't touched either: `Get-AccountPassword.ps1` already clears what it copies. Q in an area menu still goes back without logging out, and `Remove-PCloudSession` still only signs out. Use `Remove-PCloudSession -ClearPowerShellSession` or `Clear-PCloudPowerShellSession` on its own to clear the window too.
+It leaves alone the PSReadLine history file on disk, files the scripts wrote (`CSVs`, `Logs`), and a `-Log` transcript, which you asked for. The clipboard isn't touched either: `Get-AccountPassword.ps1` already clears what it copies. Q in an area menu goes back without logging out, and `Remove-PCloudSession` still only signs out. Use `Remove-PCloudSession -ClearPowerShellSession` or `Clear-PCloudPowerShellSession` on its own to clear the window too.
 
 ## Logging a session (`-Log`)
 

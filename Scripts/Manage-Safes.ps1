@@ -1057,11 +1057,9 @@ while ($true) {
     Write-Host ''
     Write-Host 'Safe management - choose an action:'
     for ($i = 0; $i -lt $actions.Count; $i++) { Write-Host ('  {0}) {1}' -f ($i + 1), $actions[$i]) }
-    Write-Host '  L) Log out (sign out and clear this PowerShell session)'
     Write-Host '  Q) Quit'
-    $c = (Read-Host ('Enter 1-{0}, L or Q' -f $actions.Count)).Trim()
+    $c = (Read-Host ('Enter 1-{0} or Q' -f $actions.Count)).Trim()
     if ($c -match '^(?i)q$') { break }
-    if ($c -match '^(?i)l$') { Disconnect-PCloudSession; exit }
     $n = 0
     if (-not ([int]::TryParse($c, [ref]$n) -and $n -ge 1 -and $n -le $actions.Count)) {
         Write-Host 'Invalid choice.' -ForegroundColor Yellow

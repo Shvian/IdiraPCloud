@@ -113,8 +113,7 @@ function Read-YesNo {
 }
 
 function Read-MainMenu {
-    # Returns the chosen action name, or $null for Q. L logs out (sign out and clear the PowerShell session)
-    # and ends the script; under Start-IdiraPCloud.ps1 that returns to the main menu.
+    # Returns the chosen action name, or $null for Q.
     param([string]$Title, [string[]]$Actions, [hashtable]$Descriptions)
     while ($true) {
         Write-Host ''
@@ -124,11 +123,9 @@ function Read-MainMenu {
             if ($Descriptions -and $Descriptions.ContainsKey($Actions[$i])) { $d = ' - ' + $Descriptions[$Actions[$i]] }
             Write-Host ('  {0}) {1}{2}' -f ($i + 1), $Actions[$i], $d)
         }
-        Write-Host '  L) Log out (sign out and clear this PowerShell session)'
         Write-Host '  Q) Quit'
-        $c = (Read-Host ('Enter 1-{0}, L or Q' -f $Actions.Count)).Trim()
+        $c = (Read-Host ('Enter 1-{0} or Q' -f $Actions.Count)).Trim()
         if ($c -match '^(?i)q$') { return $null }
-        if ($c -match '^(?i)l$') { Disconnect-PCloudSession; exit }
         $n = 0
         if ([int]::TryParse($c, [ref]$n) -and $n -ge 1 -and $n -le $Actions.Count) { return $Actions[$n - 1] }
         Write-Host 'Invalid choice.' -ForegroundColor Yellow
