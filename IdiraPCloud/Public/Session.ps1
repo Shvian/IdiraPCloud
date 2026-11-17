@@ -264,9 +264,12 @@ function Remove-PCloudSession {
     <#
     .SYNOPSIS
         Signs out locally: disposes the token, refresh token and credential and clears the Identity cookies.
+    .PARAMETER ClearPowerShellSession
+        Also clears this PowerShell window's session data (Clear-PCloudPowerShellSession). Log out with
+        Disconnect-PCloudSession, which does both.
     #>
     [CmdletBinding()]
-    param()
+    param([switch]$ClearPowerShellSession, [switch]$KeepScreen)
     $s = $script:PCloudSession
     if ($null -ne $s) {
         foreach ($name in @('AccessToken', 'RefreshToken')) {
@@ -281,6 +284,7 @@ function Remove-PCloudSession {
     $script:PCloudSession = $null
     Stop-PCloudIdleTimer
     Reset-PCloudDirectoryCache
+    if ($ClearPowerShellSession) { Clear-PCloudPowerShellSession -KeepScreen:$KeepScreen }
     [System.GC]::Collect()
 }
 
