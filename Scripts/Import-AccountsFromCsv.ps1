@@ -9,15 +9,15 @@
                           plus any column prefixed with "prop_" which becomes a platform account
                           property (prop_LogonDomain -> LogonDomain, prop_Port -> Port).
 
-    Secrets are never read from the CSV by default:
-      (default)               Accounts are created without a secret; let the CPM reconcile them.
-      -PromptForPasswords     No longer used: CSV onboarding never asks for passwords. Add an account
-                              one at a time in Manage-Accounts.ps1 to type its password.
-      -AllowPlainTextPasswordColumn
-                              Reads a Password column. Plain-text passwords in files are a security
-                              risk; use only if unavoidable and delete the file securely afterwards.
-    If the CSV contains a non-empty Password column and -AllowPlainTextPasswordColumn is not set,
-    the script stops before making any change.
+    Passwords are never asked during CSV onboarding:
+      Password (or Secret) column present
+                              Each value is turned into a SecureString as it is read and the plain
+                              text is cleared. A row with an empty value fails and that account is
+                              NOT created, so no account is left without its password. Delete the
+                              file securely afterwards.
+      No Password column      Accounts are created without a secret; let the CPM reconcile them.
+      -PromptForPasswords, -AllowPlainTextPasswordColumn
+                              No longer needed; kept so existing commands still run.
     Writes a results CSV (never containing secrets) next to the input file. Supports -WhatIf.
 .EXAMPLE
     .\Import-AccountsFromCsv.ps1 -Path .\accounts.csv -Subdomain acme
@@ -50,12 +50,19 @@ Connect-PCloudIfNeeded -IdentityUrl $IdentityUrl -Subdomain $Subdomain -PCloudUr
 
 $rows = @(Import-Csv -LiteralPath $Path)
 
-$hasPasswordValues = @($rows | Where-Object { ($_.PSObject.Properties.Name -contains 'Password') -and $_.Password }).Count -gt 0
-if ($hasPasswordValues -and -not $AllowPlainTextPasswordColumn) {
-    throw ('{0} contains plain-text passwords. Remove the Password column and let the CPM reconcile, or pass -AllowPlainTextPasswordColumn if you accept the risk.' -f $Path)
+$secretCol = $null
+if ($rows.Count -gt 0) {
+    foreach ($n in @('Password', 'Secret')) {
+        $c = $rows[0].PSObject.Properties | Where-Object { $_.Name -eq $n } | Select-Object -First 1
+        if ($c) { $secretCol = $c.Name; break }
+    }
 }
-if ($PromptForPasswords) {
-    Write-Warning 'CSV onboarding does not ask for passwords. -PromptForPasswords is ignored; the accounts are created empty for the CPM to reconcile.'
+$hasPasswordValues = [bool]$secretCol
+if ($PromptForPasswords) { Write-Warning 'CSV onboarding does not ask for passwords. -PromptForPasswords is ignored.' }
+if ($secretCol) {
+    Write-Host ("Using the passwords in the '{0}' column. A row with an empty value fails and that account is not created." -f $secretCol) -ForegroundColor Yellow
+} else {
+    Write-Host 'This CSV has no Password column, so the accounts are created without passwords for the CPM to reconcile.' -ForegroundColor Cyan
 }
 if (-not $ResultPath) {
     $ResultPath = Join-Path (Get-PCloudOutputFolder) ('{0}-results-{1:yyyyMMdd-HHmmss}.csv' -f [System.IO.Path]::GetFileNameWithoutExtension($Path), (Get-Date))
@@ -70,6 +77,7 @@ foreach ($row in $rows) {
     $status = 'Created'
     $accountId = $null
     $message = $null
+    $p = $null
     try {
         if (-not $row.SafeName -or -not $row.PlatformId -or -not $row.UserName) {
             throw 'Missing SafeName, PlatformId or UserName.'
@@ -94,9 +102,15 @@ foreach ($row in $rows) {
         if ($row.Address) { $p['Address'] = $row.Address }
         if ($row.Name) { $p['Name'] = $row.Name }
         if ($row.SecretType) { $p['SecretType'] = $row.SecretType }
-        if ($AllowPlainTextPasswordColumn -and $row.Password) {
-            $p['Secret'] = ConvertTo-SecureString -String $row.Password -AsPlainText -Force
-            $row.Password = $null
+        if ($secretCol) {
+            $plain = [string]$row.$secretCol
+            $row.$secretCol = $null
+            if (-not $plain) { throw ('The {0} column is empty for this row, so the account was not created (it would have had no password).' -f $secretCol) }
+            $ss = New-Object System.Security.SecureString
+            foreach ($ch in $plain.ToCharArray()) { $ss.AppendChar($ch) }
+            $ss.MakeReadOnly()
+            $plain = $null
+            $p['Secret'] = $ss
         }
         if ($row.AutomaticManagement -and $row.AutomaticManagement -match '^(?i)(false|0|no)$') {
             $p['DisableAutomaticManagement'] = $true
@@ -122,6 +136,9 @@ foreach ($row in $rows) {
         $status = 'Failed'
         $message = $_.Exception.Message
         Write-Warning ("Row {0} ({1}@{2}): {3}" -f $i, $row.UserName, $row.Address, $message)
+    } finally {
+        if ($p -and $p['Secret']) { $p['Secret'].Dispose() }
+        if ($secretCol) { $row.$secretCol = $null }
     }
     $results.Add([pscustomobject]@{ Row = $i; SafeName = $row.SafeName; UserName = $row.UserName; Address = $row.Address; Status = $status; AccountId = $accountId; Message = $message })
 }
