@@ -251,6 +251,61 @@ function Read-PlatformId {
     return [string]$pick.PlatformID
 }
 
+$script:PlatformPropertyCache = @{}
+
+function Get-PlatformPropertyList {
+    # The platform's required and optional account properties (Name, DisplayName, Required), read once per
+    # platform from GET /API/Platforms. Returns $null when they can't be read, so callers fall back to the
+    # name as typed.
+    param([string]$PlatformId)
+    if (-not $PlatformId) { return $null }
+    $key = $PlatformId.ToLowerInvariant()
+    if ($script:PlatformPropertyCache.ContainsKey($key)) { return $script:PlatformPropertyCache[$key] }
+    $found = $null
+    try {
+        foreach ($p in @(Get-PCloudPlatform)) {
+            if ([string](Get-NestedValue $p 'general.id') -ne $PlatformId) { continue }
+            $list = New-Object System.Collections.Generic.List[object]
+            foreach ($grp in @('required', 'optional')) {
+                foreach ($x in @(Get-NestedValue $p ('properties.{0}' -f $grp))) {
+                    if ($null -eq $x) { continue }
+                    $n = [string](Get-NestedValue $x 'name')
+                    if (-not $n) { continue }
+                    $list.Add([pscustomobject]@{ Name = $n; DisplayName = [string](Get-NestedValue $x 'displayName'); Required = ($grp -eq 'required') })
+                }
+            }
+            $found = $list.ToArray()
+            break
+        }
+    } catch {
+        Write-Verbose ('Could not read the properties of platform {0}: {1}' -f $PlatformId, $_.Exception.Message)
+    }
+    $script:PlatformPropertyCache[$key] = $found
+    return $found
+}
+
+function Format-PlatformProperty {
+    param($Item)
+    $t = $Item.Name
+    if ($Item.DisplayName -and $Item.DisplayName -ne $Item.Name) { $t = '{0} ("{1}")' -f $Item.Name, $Item.DisplayName }
+    if ($Item.Required) { $t += ' [required]' }
+    return $t
+}
+
+function Resolve-PlatformPropertyName {
+    # Returns the platform's own spelling of a property, matched by name or display name (any case).
+    # Throws when the platform's properties are known and the name isn't one of them, because the API
+    # rejects it (PASWS125E "Property ... cannot be added").
+    param([string]$PlatformId, [string]$Name)
+    $list = @(Get-PlatformPropertyList -PlatformId $PlatformId)
+    if ($list.Count -eq 0 -or $null -eq $list[0]) { return $Name }
+    $hit = @($list | Where-Object { $_.Name -eq $Name }) | Select-Object -First 1
+    if (-not $hit) { $hit = @($list | Where-Object { $_.DisplayName -eq $Name }) | Select-Object -First 1 }
+    if ($hit) { return $hit.Name }
+    $names = (@($list | ForEach-Object { Format-PlatformProperty $_ })) -join ', '
+    throw ("Property '{0}' is not defined on platform {1}, so the account can't hold it. Add it to the platform's optional properties first, or use one of: {2}" -f $Name, $PlatformId, $names)
+}
+
 function Get-CsvSecretColumn {
     # Name of the Secret (or Password) column in a CSV, or $null when there is none.
     param([object[]]$Rows)
@@ -382,6 +437,9 @@ function ConvertTo-AccountOperations {
     $existing = Get-AccountProperties $Account
     $propSet = [ordered]@{}
     $propRemove = New-Object System.Collections.Generic.List[string]
+    # Properties are checked against the platform the account will be on after this update.
+    $targetPlatform = [string]$Account.platformId
+    if ($Changes.Contains('PlatformId')) { $targetPlatform = [string]$Changes['PlatformId'].Value }
     foreach ($k in $Changes.Keys) {
         $v = $Changes[$k].Value
         switch -Regex ($k) {
@@ -404,6 +462,7 @@ function ConvertTo-AccountOperations {
                     if (-not $known) { throw ("Property '{0}' is not set on this account, so it cannot be removed." -f $pn) }
                     $propRemove.Add($pn)
                 } else {
+                    if (-not $known) { $pn = Resolve-PlatformPropertyName -PlatformId $targetPlatform -Name $pn }
                     $propSet[$pn] = [string]$v
                 }
             }
@@ -544,7 +603,7 @@ function Invoke-AddAccount {
     if ($Spec.RemoteMachines.Count -gt 0) { $p['RemoteMachines'] = $Spec.RemoteMachines; $p['AccessRestrictedToRemoteMachines'] = $true }
     if ($Spec.Properties.Count -gt 0) {
         $h = @{}
-        foreach ($k in $Spec.Properties.Keys) { $h[$k] = [string]$Spec.Properties[$k] }
+        foreach ($k in $Spec.Properties.Keys) { $h[(Resolve-PlatformPropertyName -PlatformId $Spec.PlatformId -Name $k)] = [string]$Spec.Properties[$k] }
         $p['PlatformAccountProperties'] = $h
     }
     return (New-PCloudAccount @p)
@@ -582,9 +641,18 @@ function Invoke-AccountUpdateMenu {
             $c = (Read-Host 'Choice').Trim()
             switch -Regex ($c) {
                 '^1$' {
-                    $pn = (Read-Host 'Property name (e.g. Port, LogonDomain; leave blank to go back)').Trim()
-                    if (-not $pn) { break }
-                    if ($pn -notmatch '^[A-Za-z0-9_\-]+$') { Write-Host '  Property names use letters, numbers, _ and -.' -ForegroundColor Red; break }
+                    $avail = @(Get-PlatformPropertyList -PlatformId $current.platformId)
+                    $pn = $null
+                    if ($avail.Count -gt 0 -and $null -ne $avail[0]) {
+                        $pick = Select-FromList -Items $avail -Title ('Properties of platform {0} - pick one' -f $current.platformId) -Label { param($x) Format-PlatformProperty $x }
+                        if ($null -eq $pick) { break }
+                        $pn = $pick.Name
+                    } else {
+                        Write-Host ("  Couldn't read the properties of platform {0}; type the property's name." -f $current.platformId) -ForegroundColor Yellow
+                        $pn = (Read-Host 'Property name (e.g. Port, LogonDomain; leave blank to go back)').Trim()
+                        if (-not $pn) { break }
+                        if ($pn -notmatch '^[A-Za-z0-9_\-]+$') { Write-Host '  Property names use letters, numbers, _ and -.' -ForegroundColor Red; break }
+                    }
                     $pv = Read-Host ('Value for {0}' -f $pn)
                     if ($pv -eq '') { Write-Host '  Empty value ignored. Use 2 to remove a property.' -ForegroundColor Yellow; break }
                     Add-AccountChange $changes ('prop:{0}' -f $pn) $pv $current
