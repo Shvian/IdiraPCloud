@@ -126,8 +126,12 @@ function Set-PCloudAccount {
         Updates account properties with a JSON Patch (PATCH /API/Accounts/{id}).
     .DESCRIPTION
         Use the convenience parameters, or pass -Operation with your own patch operations,
-        e.g. @{ op = 'replace'; path = '/platformAccountProperties/Port'; value = '2222' }.
-        -Property sets entries under /platformAccountProperties. Set a value to $null to remove it.
+        e.g. @{ op = 'replace'; path = '/address'; value = 'newhost.acme.local' }.
+        -Property sets platform account properties. Set a value to $null to remove it.
+        Platform properties are sent the way the API expects: one operation on
+        /platformaccountproperties whose value is an object of name/value pairs
+        (see New-PCloudAccountPropertyOperation). The API applies only the last operation
+        on a path, so operations that share a path are sent as separate requests, in order.
     .EXAMPLE
         Set-PCloudAccount -Id 12_34 -Address 'newhost.acme.local'
     .EXAMPLE
@@ -150,24 +154,75 @@ function Set-PCloudAccount {
         if ($PSBoundParameters.ContainsKey('UserName')) { $ops.Add([ordered]@{ op = 'replace'; path = '/userName'; value = $UserName }) }
         if ($PSBoundParameters.ContainsKey('PlatformId')) { $ops.Add([ordered]@{ op = 'replace'; path = '/platformId'; value = $PlatformId }) }
         if ($Property) {
+            $set = [ordered]@{}
+            $del = New-Object System.Collections.Generic.List[string]
             foreach ($key in $Property.Keys) {
-                $p = '/platformAccountProperties/{0}' -f $key
-                if ($null -eq $Property[$key]) {
-                    $ops.Add([ordered]@{ op = 'remove'; path = $p })
-                } else {
-                    $ops.Add([ordered]@{ op = 'replace'; path = $p; value = [string]$Property[$key] })
-                }
+                if ($null -eq $Property[$key]) { $del.Add([string]$key) } else { $set[[string]$key] = $Property[$key] }
             }
+            foreach ($o in @(New-PCloudAccountPropertyOperation -Set $set -Remove $del.ToArray())) { $ops.Add($o) }
         }
         if ($Operation) { foreach ($o in $Operation) { $ops.Add($o) } }
         if ($ops.Count -eq 0) { throw 'Nothing to update. Pass at least one property or -Operation.' }
 
         if ($PSCmdlet.ShouldProcess("account $Id", "Update ($($ops.Count) operation(s))")) {
-            # -InputObject keeps a single-item list serialized as a JSON array.
-            $json = ConvertTo-Json -InputObject @($ops.ToArray()) -Depth 10 -Compress
-            Invoke-PCloudApi -Method Patch -Path ('Accounts/{0}' -f (ConvertTo-PCloudPathSegment $Id)) -Body $json
+            # The API applies only the last operation on a path, so split operations that share
+            # a path into consecutive requests (order kept).
+            $batches = New-Object System.Collections.Generic.List[object]
+            $batch = New-Object System.Collections.Generic.List[object]
+            $paths = @{}
+            foreach ($o in $ops) {
+                $key = ([string]$o.path).ToLowerInvariant()
+                if ($paths.ContainsKey($key)) {
+                    $batches.Add($batch.ToArray())
+                    $batch = New-Object System.Collections.Generic.List[object]
+                    $paths = @{}
+                }
+                $paths[$key] = $true
+                $batch.Add($o)
+            }
+            if ($batch.Count -gt 0) { $batches.Add($batch.ToArray()) }
+            $result = $null
+            foreach ($b in $batches) {
+                # -InputObject keeps a single-item list serialized as a JSON array.
+                $json = ConvertTo-Json -InputObject @($b) -Depth 10 -Compress
+                $result = Invoke-PCloudApi -Method Patch -Path ('Accounts/{0}' -f (ConvertTo-PCloudPathSegment $Id)) -Body $json
+            }
+            $result
         }
     }
+}
+
+function New-PCloudAccountPropertyOperation {
+    <#
+    .SYNOPSIS
+        Builds the account PATCH operations for platform account properties.
+    .DESCRIPTION
+        The Update Account API takes platform properties as one operation on
+        /platformaccountproperties whose value is an object, for example
+        { "op": "add", "path": "/platformaccountproperties", "value": { "Notes": "text" } }.
+        "add" sets a property whether or not it already has a value. Removals use
+        { "op": "remove", "path": "/platformaccountproperties", "value": { "Notes": null } }.
+        Returns zero, one or two operations (add first, then remove).
+    .EXAMPLE
+        New-PCloudAccountPropertyOperation -Set @{ Port = '2222'; Notes = 'text' } -Remove 'Location'
+    #>
+    [CmdletBinding()]
+    param(
+        [System.Collections.IDictionary]$Set,
+        [string[]]$Remove
+    )
+    $out = New-Object System.Collections.Generic.List[object]
+    if ($Set -and $Set.Count -gt 0) {
+        $v = [ordered]@{}
+        foreach ($k in $Set.Keys) { $v[[string]$k] = [string]$Set[$k] }
+        $out.Add([ordered]@{ op = 'add'; path = '/platformaccountproperties'; value = $v })
+    }
+    if ($Remove -and $Remove.Count -gt 0) {
+        $v = [ordered]@{}
+        foreach ($k in $Remove) { $v[[string]$k] = $null }
+        $out.Add([ordered]@{ op = 'remove'; path = '/platformaccountproperties'; value = $v })
+    }
+    return $out.ToArray()
 }
 
 function Remove-PCloudAccount {

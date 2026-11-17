@@ -340,7 +340,8 @@ function Hide-PCloudUriSecret {
 function Hide-PCloudJsonSecret {
     # Redacts the value of every JSON property whose name looks secret. The rest of the text is untouched.
     param([string]$Text)
-    $pattern = ('(?i)("[^"\\]*{0}[^"\\]*"\s*:\s*)(?:"(?:[^"\\]|\\.)*"|-?\d[\d.eE+\-]*)' -f $script:PCloudSecretNames)
+    # secretType only says "password" or "key", so it is shown.
+    $pattern = ('(?i)("(?!secretType")[^"\\]*{0}[^"\\]*"\s*:\s*)(?:"(?:[^"\\]|\\.)*"|-?\d[\d.eE+\-]*)' -f $script:PCloudSecretNames)
     return ([regex]::Replace([string]$Text, $pattern, '$1"<redacted>"'))
 }
 
