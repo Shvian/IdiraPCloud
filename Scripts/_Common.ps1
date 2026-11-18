@@ -58,6 +58,36 @@ function New-PCloudOutputFile {
 }
 
 # ------------------------------------------------------------------ -Log
+function Start-PCloudSessionLog {
+    <#
+        Main menu L: starts recording the session (screen output and what you type at normal prompts) to
+        Logs\IdiraPCloud-session-<timestamp>.log. Masked prompts aren't recorded, tokens never appear and the
+        -Verbose API trace is redacted. Returns $true when the log started.
+    #>
+    if ($global:PCloudLogActive) { return $true }
+    $file = Join-Path (Get-PCloudSecureFolder -Name 'Logs') ('IdiraPCloud-session-{0:yyyyMMdd-HHmmss}.log' -f (Get-Date))
+    try {
+        $null = Start-Transcript -LiteralPath $file -Append -ErrorAction Stop
+    } catch {
+        Write-Warning ('Could not start the log ({0}).' -f $_.Exception.Message)
+        return $false
+    }
+    $global:PCloudLogActive = $true
+    $global:PCloudLogFile = $file
+    Write-Host ('Logging this session to {0}' -f $file) -ForegroundColor DarkGray
+    return $true
+}
+
+function Stop-PCloudSessionLog {
+    # Stops the session log, whether it was started with L or with -Log, and says where it was saved.
+    if (-not $global:PCloudLogActive) { return }
+    $file = $global:PCloudLogFile
+    try { $null = Stop-Transcript } catch { }
+    $global:PCloudLogActive = $false
+    $global:PCloudLogFile = $null
+    if ($file) { Write-Host ('Log saved to {0}' -f $file) -ForegroundColor DarkGray }
+}
+
 function Invoke-PCloudLogged {
     <#
         -Log on any script: runs the script again inside a PowerShell transcript and stops the transcript when
@@ -85,10 +115,13 @@ function Invoke-PCloudLogged {
         Write-Warning ('Could not start the log ({0}). Continuing without it.' -f $_.Exception.Message)
     }
     $global:PCloudLogActive = $true
+    $global:PCloudLogFile = $null
+    if ($started) { $global:PCloudLogFile = $file }
     try {
         & $ScriptPath @Bound
     } finally {
         $global:PCloudLogActive = $false
+        $global:PCloudLogFile = $null
         if ($started) {
             try { $null = Stop-Transcript } catch { }
             Write-Host ('Log saved to {0}' -f $file) -ForegroundColor DarkGray
