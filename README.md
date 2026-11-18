@@ -236,7 +236,7 @@ With `-All`, any response shaped `{ value: [...], nextLink: "..." }` is followed
 
 ## Main menu (`Start-IdiraPCloud.ps1`)
 
-The easiest way in. It signs you in once, then offers Safes, Accounts, Platforms, PSM assignment, Applications, Master Policy, System health and Reports. Reports opens a submenu with the account inventory and safe members reports. Each area opens its own menu. Pressing Q there brings you back to the main menu, and a failure in an area shows the error and returns you there too. S shows the session and X logs out and quits. The main menu has no plain quit, so leaving it always logs out. See [Log out and clearing the session](#log-out-and-clearing-the-session).
+The easiest way in. It signs you in once, then offers Safes, Accounts, Platforms, PSM assignment, Applications, Master Policy, System health and Reports. Reports opens a submenu with the account inventory and safe members reports. Each area opens its own menu. Pressing Q there brings you back to the main menu, and a failure in an area shows the error and returns you there too. S shows the session, L starts or stops a session log (see [Logging a session](#logging-a-session--log)), and X logs out and quits. The main menu has no plain quit, so leaving it always logs out. See [Log out and clearing the session](#log-out-and-clearing-the-session).
 
 ```powershell
 cd C:\Tools\IdiraPCloud
@@ -496,6 +496,8 @@ Logging out signs you out of Privilege Cloud and clears what the session left in
 It leaves alone the PSReadLine history file on disk, files the scripts wrote (`CSVs`, `Logs`), and a `-Log` transcript, which you asked for. The clipboard isn't touched either: `Get-AccountPassword.ps1` already clears what it copies. Q in an area menu goes back without logging out, and `Remove-PCloudSession` still only signs out. Use `Remove-PCloudSession -ClearPowerShellSession` or `Clear-PCloudPowerShellSession` on its own to clear the window too.
 
 ## Logging a session (`-Log`)
+
+**From the main menu:** pick **L** to start recording the session to `Logs\IdiraPCloud-session-<timestamp>.log`. Everything shown and typed from then on is recorded, including the areas you open. Pick L again to stop, and the menu shows where the file is. Opening areas from the menu doesn't stop it, so their actions are recorded too. A log started with L stops only when you pick L again or when `Start-IdiraPCloud.ps1` ends (X, an error or the idle sign-out). A log started with `-Log` can also be stopped with L. Masked prompts aren't recorded, tokens never appear and the `-Verbose` trace is redacted, but the log can still describe privileged access, so the `Logs` folder is limited to you, SYSTEM and Administrators.
 
 Add `-Log` to any script, including `Start-IdiraPCloud.ps1`, to record the run to `Logs\IdiraPCloud-<script>-<timestamp>.log` in the main IdiraPCloud folder. `-LogPath <file>` picks the file, and a bare file name also goes into `Logs`. The log starts before sign-in and stops when the script ends, however it ends: Q, an error, Ctrl+C or the idle sign-out. Everything opened from the main menu is recorded in the same log.
 

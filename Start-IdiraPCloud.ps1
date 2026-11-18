@@ -75,6 +75,10 @@ function Invoke-ReportsMenu {
 
 Connect-PCloudIfNeeded -IdentityUrl $IdentityUrl -Subdomain $Subdomain -PCloudUrl $PCloudUrl -Credential $Credential -AuthMethod $AuthMethod
 
+# A log started here with L keeps recording while areas are open, and is stopped when this script ends,
+# however it ends (X, an error, the idle sign-out).
+$menuLog = $false
+try {
 while ($true) {
     $s = Get-PCloudSession
     Write-Host ''
@@ -86,13 +90,28 @@ while ($true) {
     }
     for ($i = 0; $i -lt $areas.Count; $i++) { Write-Host ('  {0}) {1,-25} {2}' -f ($i + 1), $areas[$i].Name, $areas[$i].Text) }
     Write-Host '  S) Session details'
+    if ($global:PCloudLogActive) {
+        $lf = $global:PCloudLogFile
+        if (-not $lf) { $lf = 'the log' }
+        Write-Host ('  L) Stop logging (writing to {0})' -f $lf)
+    } else {
+        Write-Host '  L) Log this session to a file (commands and output from now on)'
+    }
     Write-Host '  X) Log out and quit (signs out and clears this PowerShell session)'
-    $c = (Read-Host ('Enter 1-{0}, S or X' -f $areas.Count)).Trim()
+    $c = (Read-Host ('Enter 1-{0}, S, L or X' -f $areas.Count)).Trim()
     if ($c -match '^(?i)x$') { Disconnect-PCloudSession; break }
     if ($c -match '^(?i)s$') { Get-PCloudSession | Format-List | Out-String | Write-Host; continue }
+    if ($c -match '^(?i)l$') {
+        if ($global:PCloudLogActive) { Stop-PCloudSessionLog; $menuLog = $false }
+        elseif (Start-PCloudSessionLog) { $menuLog = $true }
+        continue
+    }
     $n = 0
     if (-not ([int]::TryParse($c, [ref]$n) -and $n -ge 1 -and $n -le $areas.Count)) { Write-Host 'Invalid choice.' -ForegroundColor Yellow; continue }
 
     $area = $areas[$n - 1]
     if ($area.Name -eq 'Reports') { Invoke-ReportsMenu } else { Invoke-AreaScript -Area $area }
+}
+} finally {
+    if ($menuLog) { Stop-PCloudSessionLog }
 }
