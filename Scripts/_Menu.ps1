@@ -96,6 +96,9 @@ function Import-WorkCsv {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "CSV not found: $Path" }
     $rows = @(Import-Csv -LiteralPath $Path)
     if ($rows.Count -eq 0) { throw "CSV has no rows: $Path" }
+    # Excel in some regions saves CSVs with semicolons: one column whose name holds ';' means that.
+    $cols = @($rows[0].PSObject.Properties | ForEach-Object { $_.Name })
+    if ($cols.Count -eq 1 -and $cols[0] -like '*;*') { $rows = @(Import-Csv -LiteralPath $Path -Delimiter ';') }
     return $rows
 }
 
