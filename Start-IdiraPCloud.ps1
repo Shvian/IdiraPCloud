@@ -75,7 +75,8 @@ function Invoke-ReportsMenu {
 
 Connect-PCloudIfNeeded -IdentityUrl $IdentityUrl -Subdomain $Subdomain -PCloudUrl $PCloudUrl -Credential $Credential -AuthMethod $AuthMethod
 
-# A log started here with L is stopped when the menu ends, however it ends (X, an error, the idle sign-out).
+# A log started here with L keeps recording while areas are open, and is stopped when this script ends,
+# however it ends (X, an error, the idle sign-out).
 $menuLog = $false
 try {
 while ($true) {
