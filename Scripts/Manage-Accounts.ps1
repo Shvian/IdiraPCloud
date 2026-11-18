@@ -668,7 +668,7 @@ function Invoke-AccountUpdateMenu {
                         if (-not $pn) { break }
                         if ($pn -notmatch '^[A-Za-z0-9_\-]+$') { Write-Host '  Property names use letters, numbers, _ and -.' -ForegroundColor Red; break }
                     }
-                    $pv = Read-Host ('Value for {0}' -f $pn)
+                    $pv = Read-MultilineValue -Prompt ('Value for {0}' -f $pn)
                     if ($pv -eq '') { Write-Host '  Empty value ignored. Use 2 to remove a property.' -ForegroundColor Yellow; break }
                     Add-AccountChange $changes ('prop:{0}' -f $pn) $pv $current
                 }
@@ -982,7 +982,7 @@ function Read-NewAccount {
         $pn = (Read-Host '  Property name').Trim()
         if (-not $pn) { break }
         if ($pn -notmatch '^[A-Za-z0-9_\-]+$') { Write-Host '  Property names use letters, numbers, _ and -.' -ForegroundColor Red; continue }
-        $pv = Read-Host ('  Value for {0}' -f $pn)
+        $pv = Read-MultilineValue -Prompt ('  Value for {0}' -f $pn)
         if ($pv -ne '') { $props[$pn] = $pv }
     }
     $auto = Read-YesNo 'Let the CPM manage this password automatically?' $true

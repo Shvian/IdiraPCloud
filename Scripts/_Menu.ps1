@@ -102,6 +102,60 @@ function Import-WorkCsv {
     return $rows
 }
 
+function Read-MultilineValue {
+    <#
+        Reads a value that can span several lines, for platform property values.
+        - Pasting a block keeps every line: keys that arrive right after Enter are part of the paste.
+        - When typing, end a line with a backslash (\) to continue on the next line.
+        Lines are joined with CRLF. Waiting here counts toward the idle sign-out like any prompt.
+        Outside the normal console (ISE, VS Code, redirected input) only the backslash form works.
+    #>
+    param([string]$Prompt)
+    $nl = "`r`n"
+    if (-not (Test-PCloudTimedInput)) {
+        $lines = New-Object System.Collections.Generic.List[string]
+        $p = $Prompt
+        while ($true) {
+            $l = [string](Read-Host $p)
+            if ($l.EndsWith('\')) { $lines.Add($l.Substring(0, $l.Length - 1)); $p = '  (next line)'; continue }
+            $lines.Add($l)
+            break
+        }
+        return ($lines.ToArray() -join $nl)
+    }
+    Write-Host ('{0} (paste several lines, or end a line with \ to continue): ' -f $Prompt) -NoNewline
+    $sb = New-Object System.Text.StringBuilder
+    while ($true) {
+        if ([Console]::KeyAvailable) {
+            $k = [Console]::ReadKey($true)
+            Register-PCloudActivity
+            if ($k.Key -eq [ConsoleKey]::Enter) {
+                # A paste delivers the next line's keys at once; a person doesn't type within 60 ms of Enter.
+                Start-Sleep -Milliseconds 60
+                $more = [Console]::KeyAvailable
+                if (-not $more -and $sb.Length -gt 0 -and $sb[$sb.Length - 1] -eq [char]'\') { $sb.Length = $sb.Length - 1; $more = $true }
+                Write-Host ''
+                if ($more) { [void]$sb.Append($nl); Write-Host '  > ' -NoNewline; continue }
+                return $sb.ToString()
+            }
+            if ($k.Key -eq [ConsoleKey]::Backspace) {
+                # Backspace edits the current line only.
+                if ($sb.Length -gt 0 -and $sb[$sb.Length - 1] -ne [char]10) {
+                    $sb.Length = $sb.Length - 1
+                    Write-Host ([string][char]8 + ' ' + [string][char]8) -NoNewline
+                }
+                continue
+            }
+            $ch = $k.KeyChar
+            if ($ch -eq [char]9 -or ($ch -and -not [char]::IsControl($ch))) { [void]$sb.Append($ch); Write-Host $ch -NoNewline }
+            continue
+        }
+        $left = Get-PCloudIdleSecondsLeft
+        if ($null -ne $left -and $left -le 0) { $null = Invoke-PCloudIdleCheck; Write-Host ''; exit }
+        Start-Sleep -Milliseconds 25
+    }
+}
+
 function Read-YesNo {
     param([string]$Prompt, [bool]$Default = $false)
     $hint = '(y/N)'
