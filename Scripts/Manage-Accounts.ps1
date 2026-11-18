@@ -194,7 +194,13 @@ function Format-AccountRow {
         $o['AccessRestrictedToRemoteMachines'] = Get-NestedValue $Account 'remoteMachinesAccess.accessRestrictedToRemoteMachines'
         $props = Get-NestedValue $Account 'platformAccountProperties'
         if ($props) {
-            foreach ($p in $props.PSObject.Properties) { $o[('prop_{0}' -f $p.Name)] = $p.Value }
+            # Each property is a column named after it (Notes), so the file can go straight back into an update.
+            # A property whose name matches one of the account columns keeps the prop_ prefix.
+            foreach ($p in $props.PSObject.Properties) {
+                $col = $p.Name
+                if ($script:AccountCsvColumns -contains $col -or $o.Contains($col)) { $col = 'prop_{0}' -f $p.Name }
+                $o[$col] = $p.Value
+            }
         }
     }
     [pscustomobject]$o
@@ -341,15 +347,30 @@ function Read-Secret {
 
 # ------------------------------------------------------------------ specs and changes
 
+# CSV columns the script reads itself, plus the read-only columns of its own exports (so an export can be
+# edited and fed back). For AddAccount and UpdateAccount, any other column is a platform property, with or
+# without the prop_ prefix.
+$script:AccountCsvColumns = @(
+    'AccountId', 'SafeName', 'UserName', 'Address', 'Search', 'Name', 'PlatformId', 'SecretType',
+    'AutomaticManagement', 'ManualManagementReason', 'RemoteMachines', 'AccessRestrictedToRemoteMachines',
+    'NewName', 'NewAddress', 'NewUserName', 'NewPlatformId',
+    'LinkType', 'LinkedAccountId', 'LinkedSafe', 'LinkedName', 'LinkedFolder', 'Secret', 'Password',
+    'CPMStatus', 'LastModified', 'LastVerified', 'LastReconciled', 'Created',
+    'Row', 'Action', 'Target', 'Id', 'Status', 'Message'
+)
+
 function ConvertTo-AccountSpec {
     # Normalized work item from a CSV row, or from the script's single-mode parameters when $Row is $null.
     param($Row, [int]$Index)
     if ($null -ne $Row) {
         $props = [ordered]@{}
+        $bareProps = ($Action -eq 'AddAccount' -or $Action -eq 'UpdateAccount')
         foreach ($col in $Row.PSObject.Properties) {
-            if ($col.Name -like 'prop_*' -and $null -ne $col.Value -and ([string]$col.Value).Trim() -ne '') {
-                $props[$col.Name.Substring(5)] = ([string]$col.Value).Trim()
-            }
+            if ($null -eq $col.Value -or ([string]$col.Value).Trim() -eq '') { continue }
+            $pn = $null
+            if ($col.Name -like 'prop_*') { $pn = $col.Name.Substring(5) }
+            elseif ($bareProps -and $script:AccountCsvColumns -notcontains $col.Name) { $pn = $col.Name.Trim() }
+            if ($pn) { $props[$pn] = ([string]$col.Value).Trim() }
         }
         return @{
             Index                  = $Index
@@ -653,7 +674,7 @@ function Invoke-AccountUpdateMenu {
                         if (-not $pn) { break }
                         if ($pn -notmatch '^[A-Za-z0-9_\-]+$') { Write-Host '  Property names use letters, numbers, _ and -.' -ForegroundColor Red; break }
                     }
-                    $pv = Read-Host ('Value for {0}' -f $pn)
+                    $pv = Read-MultilineValue -Prompt ('Value for {0}' -f $pn)
                     if ($pv -eq '') { Write-Host '  Empty value ignored. Use 2 to remove a property.' -ForegroundColor Yellow; break }
                     Add-AccountChange $changes ('prop:{0}' -f $pn) $pv $current
                 }
@@ -899,7 +920,9 @@ function Invoke-AccountAction {
                     switch ($Action) {
                         'UpdateAccount' {
                             $ch = Get-SpecChanges -Spec $spec -Account $acct
-                            if ($ch.Count -eq 0) { throw 'Nothing to update. Fill in at least one New* value, AutomaticManagement or prop_ column.' }
+                            if ($ch.Count -eq 0) {
+                                throw ('Nothing to update in this row. Fill in a New* value, AutomaticManagement, or a platform property column (for example Notes or prop_Notes). Columns read: {0}' -f ((@($rows[0].PSObject.Properties | ForEach-Object { $_.Name })) -join ', '))
+                            }
                             $ops = @(ConvertTo-AccountOperations -Account $acct -Changes $ch)
                             Set-PCloudAccount -Id $id -Operation $ops -Confirm:$false | Out-Null
                             $msg = (@($ch.Keys | ForEach-Object { '{0}={1}' -f $ch[$_].Label, $ch[$_].Display })) -join '; '
@@ -965,7 +988,7 @@ function Read-NewAccount {
         $pn = (Read-Host '  Property name').Trim()
         if (-not $pn) { break }
         if ($pn -notmatch '^[A-Za-z0-9_\-]+$') { Write-Host '  Property names use letters, numbers, _ and -.' -ForegroundColor Red; continue }
-        $pv = Read-Host ('  Value for {0}' -f $pn)
+        $pv = Read-MultilineValue -Prompt ('  Value for {0}' -f $pn)
         if ($pv -ne '') { $props[$pn] = $pv }
     }
     $auto = Read-YesNo 'Let the CPM manage this password automatically?' $true
