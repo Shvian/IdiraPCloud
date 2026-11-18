@@ -194,7 +194,13 @@ function Format-AccountRow {
         $o['AccessRestrictedToRemoteMachines'] = Get-NestedValue $Account 'remoteMachinesAccess.accessRestrictedToRemoteMachines'
         $props = Get-NestedValue $Account 'platformAccountProperties'
         if ($props) {
-            foreach ($p in $props.PSObject.Properties) { $o[('prop_{0}' -f $p.Name)] = $p.Value }
+            # Each property is a column named after it (Notes), so the file can go straight back into an update.
+            # A property whose name matches one of the account columns keeps the prop_ prefix.
+            foreach ($p in $props.PSObject.Properties) {
+                $col = $p.Name
+                if ($script:AccountCsvColumns -contains $col -or $o.Contains($col)) { $col = 'prop_{0}' -f $p.Name }
+                $o[$col] = $p.Value
+            }
         }
     }
     [pscustomobject]$o
