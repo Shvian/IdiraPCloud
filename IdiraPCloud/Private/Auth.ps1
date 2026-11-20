@@ -186,7 +186,8 @@ function Invoke-PCloudIdentityPost {
         [Parameter(Mandatory = $true)][string]$BaseUrl,
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][hashtable]$Body,
-        [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession
+        [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession,
+        [hashtable]$Headers
     )
     $uri = $BaseUrl.TrimEnd('/') + $Path
     Assert-PCloudHttpsUrl -Url $uri -Name 'Identity URL'
@@ -194,7 +195,9 @@ function Invoke-PCloudIdentityPost {
     if ($WebSession) { $params['WebSession'] = $WebSession }
     $params['Method'] = 'Post'
     $params['Uri'] = $uri
-    $params['Headers'] = @{ 'X-IDAP-NATIVE-CLIENT' = 'true'; 'Accept' = 'application/json' }
+    $h = @{ 'X-IDAP-NATIVE-CLIENT' = 'true'; 'Accept' = 'application/json' }
+    if ($Headers) { foreach ($k in $Headers.Keys) { $h[$k] = $Headers[$k] } }
+    $params['Headers'] = $h
     $params['ContentType'] = 'application/json; charset=utf-8'
     $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject $Body -Depth 5 -Compress))
     $params['Body'] = $bodyBytes
@@ -271,16 +274,20 @@ function Invoke-PCloudInteractiveLogin {
     # PlatformTokenResponse asks Identity for a platform token plus a refresh token (as CyberArk's ark-sdk does),
     # so the session can be renewed later without prompting.
     $startBody = [ordered]@{ User = $user; Version = '1.0'; PlatformTokenResponse = $true; MfaRequestor = 'DeviceAgent' }
-    $start = Invoke-PCloudIdentityPost -BaseUrl $baseUrl -Path '/Security/StartAuthentication' -Body $startBody -WebSession $ws
+    # OobIdPAuth asks Identity for what a console needs to finish a SAML (external IdP) sign-in:
+    # a short browser URL plus an IdP login session to complete, instead of a browser-only redirect.
+    $idpHeaders = @{ 'OobIdPAuth' = 'true' }
+    $start = Invoke-PCloudIdentityPost -BaseUrl $baseUrl -Path '/Security/StartAuthentication' -Body $startBody -WebSession $ws -Headers $idpHeaders
 
     # The tenant may live on another pod; Identity then tells us where to restart.
-    if ($start.PodFqdn -and -not $start.SessionId) {
+    if ($start.PodFqdn -and -not $start.SessionId -and -not $start.IdpRedirectUrl -and -not $start.IdpRedirectShortUrl) {
         $baseUrl = 'https://' + $start.PodFqdn
         Write-Verbose "Identity redirected to $baseUrl"
-        $start = Invoke-PCloudIdentityPost -BaseUrl $baseUrl -Path '/Security/StartAuthentication' -Body $startBody -WebSession $ws
+        $start = Invoke-PCloudIdentityPost -BaseUrl $baseUrl -Path '/Security/StartAuthentication' -Body $startBody -WebSession $ws -Headers $idpHeaders
     }
-    if ($start.IdpRedirectUrl) {
-        throw "User '$user' signs in through an external identity provider (SAML), which needs a browser. Use a service user (-AuthMethod ServiceUser) or a token (-AuthMethod AccessToken)."
+    if ($start.IdpRedirectUrl -or $start.IdpRedirectShortUrl) {
+        $result = Invoke-PCloudSamlLogin -Start $start -BaseUrl $baseUrl -WebSession $ws -User $user -Headers $idpHeaders
+        return (Complete-PCloudInteractiveLogin -Result $result -WebSession $ws -BaseUrl $baseUrl -User $user)
     }
     if (-not $start.SessionId) { throw 'Identity did not return a sign-in session.' }
 
@@ -345,17 +352,7 @@ function Invoke-PCloudInteractiveLogin {
 
         switch ([string]$result.Summary) {
             'LoginSuccess' {
-                if (-not $result.Token) { throw 'Identity reported success but returned no token.' }
-                Write-Verbose "Signed in as $user"
-                $s.IdentityWebSession = $ws
-                $s.IdentityBaseUrl = $baseUrl
-                # Remember who signed in (shown by Get-PCloudSession; reused if a full sign-in is needed again).
-                $s.UserName = $user
-                $refresh = $null
-                if ($result.PSObject.Properties.Name -contains 'RefreshToken') { $refresh = [string]$result.RefreshToken }
-                if (-not $refresh) { $refresh = Get-PCloudCookieValue -WebSession $ws -BaseUrl $baseUrl -Name 'refreshToken' }
-                if ($refresh) { Write-Verbose 'Identity refresh token captured.' } else { Write-Verbose 'No refresh token returned; renewal will use the Identity session cookie.' }
-                return [pscustomobject]@{ Token = [string]$result.Token; RefreshToken = $refresh }
+                return (Complete-PCloudInteractiveLogin -Result $result -WebSession $ws -BaseUrl $baseUrl -User $user)
             }
             'StartNextChallenge' { $index++ }
             'NewPackage' {
@@ -366,6 +363,79 @@ function Invoke-PCloudInteractiveLogin {
         }
     }
     throw 'Identity sign-in ended without a token.'
+}
+
+function Complete-PCloudInteractiveLogin {
+    # Stores the sign-in state on the session and returns the token and refresh token.
+    param($Result, $WebSession, [string]$BaseUrl, [string]$User)
+    $s = $script:PCloudSession
+    if (-not $Result.Token) { throw 'Identity reported success but returned no token.' }
+    Write-Verbose "Signed in as $User"
+    $s.IdentityWebSession = $WebSession
+    $s.IdentityBaseUrl = $BaseUrl
+    # Remember who signed in (shown by Get-PCloudSession; reused if a full sign-in is needed again).
+    $s.UserName = $User
+    $refresh = $null
+    if ($Result.PSObject.Properties.Name -contains 'RefreshToken') { $refresh = [string]$Result.RefreshToken }
+    if (-not $refresh) { $refresh = Get-PCloudCookieValue -WebSession $WebSession -BaseUrl $BaseUrl -Name 'refreshToken' }
+    if ($refresh) { Write-Verbose 'Identity refresh token captured.' } else { Write-Verbose 'No refresh token returned; renewal will use the Identity session cookie.' }
+    return [pscustomobject]@{ Token = [string]$Result.Token; RefreshToken = $refresh }
+}
+
+function Invoke-PCloudSamlLogin {
+    <#
+        SAML (external identity provider) sign-in from the console. Identity returns a short URL for the
+        browser and an IdP login session. The browser is opened on that URL; after the user signs in at the
+        identity provider, either:
+          - Identity shows a PIN in the browser (IdpOobAuthPinRequired): it is typed here, masked, and sent
+            to /Security/AdvanceAuthentication with MechanismId OOBAUTHPIN, or
+          - this polls /Security/OobAuthStatus every 2 seconds until the browser sign-in completes.
+        This is the flow CyberArk's ark-sdk and the IdentityCommand module use. The token never passes
+        through the browser; it comes back on the console's own Identity session.
+    #>
+    param($Start, [string]$BaseUrl, $WebSession, [string]$User, [hashtable]$Headers)
+    $s = $script:PCloudSession
+    $url = [string]$Start.IdpRedirectShortUrl
+    if (-not $url) { $url = [string]$Start.IdpRedirectUrl }
+    $idpSession = [string]$Start.IdpLoginSessionId
+    if (-not $idpSession) {
+        throw "User '$User' signs in through an external identity provider (SAML), but Identity did not return a login session to complete it from the console. Use a service user (-AuthMethod ServiceUser) or a token (-AuthMethod AccessToken)."
+    }
+    if ($url -notmatch '^https://') { throw 'Identity returned an identity provider URL that is not HTTPS; not opening it.' }
+
+    Write-Host ''
+    Write-Host ("'{0}' signs in through your identity provider (SAML)." -f $User) -ForegroundColor Cyan
+    Write-Host 'Opening your browser to sign in. If it does not open, go to:'
+    Write-Host ('  {0}' -f $url)
+    try { Start-Process $url } catch { Write-Host "Couldn't open the browser; open the link above yourself." -ForegroundColor Yellow }
+
+    if ($Start.IdpOobAuthPinRequired) {
+        $pin = Read-Host 'After signing in, enter the PIN shown in the browser' -AsSecureString
+        $answer = ConvertFrom-PCloudSecureString $pin
+        $pin.Dispose()
+        try {
+            $result = Invoke-PCloudIdentityPost -BaseUrl $BaseUrl -Path '/Security/AdvanceAuthentication' -WebSession $WebSession -Headers $Headers -Body @{
+                SessionId = $idpSession; MechanismId = 'OOBAUTHPIN'; Action = 'Answer'; Answer = $answer
+            }
+        } finally { $answer = $null }
+        if ([string]$result.Summary -ne 'LoginSuccess' -or -not $result.Token) {
+            throw ("The identity provider sign-in was not accepted (status '{0}')." -f $result.Summary)
+        }
+        return $result
+    }
+
+    Write-Host 'Waiting for you to finish signing in in the browser (Ctrl+C to cancel)...'
+    $deadline = (Get-Date).AddSeconds([Math]::Max(120, [int]$s.MfaTimeoutSec))
+    while ($true) {
+        if ((Get-Date) -gt $deadline) { throw 'Timed out waiting for the identity provider sign-in in the browser.' }
+        Start-Sleep -Seconds 2
+        $result = Invoke-PCloudIdentityPost -BaseUrl $BaseUrl -Path '/Security/OobAuthStatus' -WebSession $WebSession -Headers $Headers -Body @{ SessionId = $idpSession }
+        $state = [string]$result.State
+        if ($state -eq 'Success' -or ([string]$result.Summary -eq 'LoginSuccess' -and $result.Token)) { return $result }
+        if ($state -match '^(?i)(Fail|Error|Denied|Reject|Expire|Cancel)') {
+            throw ("The identity provider sign-in ended with state '{0}'." -f $state)
+        }
+    }
 }
 
 function Get-PCloudCookieValue {
